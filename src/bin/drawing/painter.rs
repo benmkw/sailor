@@ -32,6 +32,7 @@ pub struct Painter {
     rx: crossbeam_channel::Receiver<std::result::Result<notify::event::Event, notify::Error>>,
     _watcher: RecommendedWatcher,
     glyph_brush: GlyphBrush<()>,
+    staging_belt: wgpu::util::StagingBelt,
     temperature: crate::drawing::weather::Temperature,
 }
 
@@ -198,6 +199,7 @@ impl Painter {
 
         let glyph_brush =
             GlyphBrushBuilder::using_font(font).build(&mut device, TextureFormat::Bgra8Unorm);
+        let staging_belt = wgpu::util::StagingBelt::new(1024);
 
         let mut temperature = crate::drawing::weather::Temperature::init(&mut device, &mut queue);
 
@@ -228,6 +230,7 @@ impl Painter {
             _watcher: watcher,
             rx,
             glyph_brush,
+            staging_belt,
             temperature,
         }
     }

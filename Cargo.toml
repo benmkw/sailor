@@ -26,8 +26,8 @@ path = "src/bin/main.rs"
 [dependencies]
 config = "0.10"
 crossbeam-channel = "0.5"
-imgui = "0.5"
-imgui-wgpu = "0.11"
+imgui = "0.6"
+imgui-wgpu = "0.12"
 log = { version = "0.4", features = ["serde"] }
 lyon = "0.13"
 malloc_size_of_derive = "0.1"
@@ -43,14 +43,13 @@ pretty_env_logger = "0.4"
 quick-protobuf = "0.8"
 serde = "1.0"
 serde_derive = "1.0"
-shaderc = "0.6"
-ureq = "1.5"
+shaderc = "0.7"
+ureq = "2.0.0-rc2"
 varint = "0.9"
 wgpu = "0.6"
 wgpu_glyph = "0.10"
-winit = "0.22"
+winit = "0.23.0"
+imgui-winit-support = "0.6"
 
-[dependencies.imgui-winit-support]
-version = "0.5"
-default-features = false
-features = ["winit-22"]
+[patch.crates-io]
+winit = { git = "https://github.com/rust-windowing/winit", rev = "6f70fd90b97175d0776f04237730e2b255af29cd" }

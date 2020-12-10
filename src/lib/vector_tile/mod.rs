@@ -26,18 +26,18 @@ pub struct Layer {
     pub features: Vec<(u32, Range<u32>)>,
 }
 
-fn area(path: &Path) -> f32 {
-    let mut points = path.points().to_vec();
-    points.push(*points.first().expect("Path contains no points!"));
-    let mut area = 0f32;
-    for i in 0..points.len() - 1 {
-        area += points[i].x * points[i + 1].y;
-    }
-    for i in 0..points.len() - 1 {
-        area -= points[i + 1].x * points[i].y;
-    }
-    area + points[points.len() - 1].x * points[1].y - points[points.len() - 1].y * points[1].x
-}
+// fn area(path: &Path) -> f32 {
+//     let mut points = path.points().to_vec();
+//     points.push(*points.first().expect("Path contains no points!"));
+//     let mut area = 0f32;
+//     for i in 0..points.len() - 1 {
+//         area += points[i].x * points[i + 1].y;
+//     }
+//     for i in 0..points.len() - 1 {
+//         area -= points[i + 1].x * points[i].y;
+//     }
+//     area + points[points.len() - 1].x * points[1].y - points[points.len() - 1].y * points[1].x
+// }
 
 fn parse_one_to_path(
     geometry_type: GeomType,

@@ -44,7 +44,7 @@ impl AppState {
             hovered_objects: vec![],
             selected_objects: vec![],
             stats: Stats::new(),
-            ui: UIState::new(),
+            ui: UIState::default(),
             visible_tiles: BTreeMap::new(),
             feature_collection: Arc::new(RwLock::new(FeatureCollection::new(
                 CONFIG.renderer.max_features as u32,
