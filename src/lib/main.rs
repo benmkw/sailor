@@ -1,5 +1,4 @@
 use nalgebra_glm as glm;
-use parity_util_mem as malloc_size_of;
 
 mod cache;
 mod css;

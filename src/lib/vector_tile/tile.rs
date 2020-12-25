@@ -15,7 +15,7 @@ pub struct TileStats {
     pub features: usize,
     pub vertices: usize,
     pub indices: usize,
-    pub size: usize,
+    // pub size: usize,
 }
 
 impl TileStats {
@@ -25,7 +25,7 @@ impl TileStats {
             features: 0,
             vertices: 0,
             indices: 0,
-            size: 0,
+            // size: 0,
         }
     }
 }
@@ -39,7 +39,7 @@ impl std::ops::Add for TileStats {
             features: self.features + rhs.features,
             vertices: self.vertices + rhs.vertices,
             indices: self.indices + rhs.indices,
-            size: self.size + rhs.size,
+            // size: self.size + rhs.size,
         }
     }
 }
@@ -197,19 +197,16 @@ impl Tile {
                 .read()
                 .expect("Failed to read initial objects. This is a bug. Please report it.");
 
-            let feature_size = std::mem::size_of::<(u32, std::ops::Range<u32>)>();
-            let vertex_size = std::mem::size_of::<Vertex>();
-            let index_size = std::mem::size_of::<u32>();
+            // let feature_size = std::mem::size_of::<(u32, std::ops::Range<u32>)>();
+            // let vertex_size = std::mem::size_of::<Vertex>();
+            // let index_size = std::mem::size_of::<u32>();
 
             TileStats {
                 objects: objects.len(),
                 features: features.len(),
                 vertices: mesh.vertices.len(),
                 indices: mesh.indices.len(),
-                size: objects.iter().map(|o| o.size()).sum::<usize>()
-                    + features.capacity() * feature_size
-                    + mesh.vertices.capacity() * vertex_size
-                    + mesh.indices.capacity() * index_size,
+                // size:  # TODO https://github.com/nnethercote/dhat-rs ?
             }
         };
 

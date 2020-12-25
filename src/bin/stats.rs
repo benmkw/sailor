@@ -1,5 +1,6 @@
 pub struct Stats {
     stamp: std::time::Instant,
+    // TODO PERF this should really be just an array with an index
     last_frametimes: std::collections::VecDeque<u64>,
     frames: u64,
 }
@@ -28,10 +29,10 @@ impl Stats {
     }
 
     pub fn get_average(&self) -> f64 {
-        self.last_frametimes.iter().sum::<u64>() as f64 / 30.0
+        self.last_frametimes.iter().sum::<u64>() as f64 / self.last_frametimes.len() as f64
     }
 
     pub fn get_last_delta(&self) -> f32 {
-        (self.last_frametimes[29] as f64 / 1_000_000f64) as f32
+        (self.last_frametimes[self.last_frametimes.len() - 1] as f64 / 1_000_000f64) as f32
     }
 }

@@ -164,7 +164,7 @@ pub struct Rule {
 }
 
 /// A single CSS selector.
-#[derive(Debug, Clone, PartialEq, Eq, Hash, malloc_size_of_derive::MallocSizeOf)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Selector {
     /// The type a selector matches.
     /// E.g. `"layer"`.
@@ -290,11 +290,6 @@ impl Selector {
         }
 
         true
-    }
-
-    pub fn size(&self) -> usize {
-        use parity_util_mem::MallocSizeOfExt;
-        std::mem::size_of::<Selector>() + self.malloc_size_of()
     }
 }
 
@@ -656,10 +651,4 @@ where
             a: 1.0,
         }),
     ))
-}
-
-#[test]
-fn selector_size() {
-    let selector = super::Selector::default();
-    assert_eq!(selector.size(), 96);
 }
