@@ -7,7 +7,7 @@ use crate::config::CONFIG;
 use lyon::math::vector;
 use osm::*;
 use winit::{
-    dpi::LogicalPosition,
+    dpi::{LogicalPosition, PhysicalPosition},
     event::{
         ElementState, Event, KeyboardInput, MouseButton, MouseScrollDelta, VirtualKeyCode,
         WindowEvent,
@@ -40,7 +40,7 @@ fn main() {
     let mut hud = drawing::ui::HUD::new(&painter.window, &mut painter.device, &mut painter.queue);
 
     let mut mouse_down = false;
-    let mut last_pos = winit::dpi::LogicalPosition::new(0.0, 0.0);
+    let mut last_pos = winit::dpi::PhysicalPosition::new(0.0, 0.0);
 
     event_loop.run(move |event, _, control_flow| {
         *control_flow = if cfg!(feature = "metal-auto-capture") {
@@ -99,14 +99,16 @@ fn main() {
                     if route_mouse {
                         match delta {
                             MouseScrollDelta::LineDelta(_, y) => app_state.zoom += 0.1 * y,
-                            MouseScrollDelta::PixelDelta(LogicalPosition { y, .. }) => {
+                            MouseScrollDelta::PixelDelta(PhysicalPosition { y, .. }) => {
                                 app_state.zoom += 0.001 * y as f32
                             }
                         }
                     }
                 }
                 WindowEvent::CursorMoved { position, .. } => {
-                    let logical_position = position.to_logical(painter.get_hidpi_factor());
+                    let logical_position: LogicalPosition<f64> =
+                        position.to_logical(painter.get_hidpi_factor());
+
                     let size = app_state.screen.get_tile_size() as f32;
                     let mut delta = vector(
                         (logical_position.x - last_pos.x) as f32,
@@ -127,7 +129,7 @@ fn main() {
                     delta.x *= zoom_x;
                     delta.y *= zoom_y;
 
-                    last_pos = logical_position;
+                    last_pos = position;
 
                     if route_mouse {
                         if mouse_down {

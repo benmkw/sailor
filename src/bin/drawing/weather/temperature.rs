@@ -5,7 +5,10 @@ use wgpu::{
     Texture,
 };
 
-use crate::drawing::helpers::{load_glsl, ShaderStage};
+use wgpu::*; // TODO remove
+
+use crate::drawing::helpers::ShaderStage;
+// use crate::drawing::helpers::{load_glsl, ShaderStage};
 
 use crate::config::CONFIG;
 use osm::as_byte_slice;
@@ -71,17 +74,20 @@ impl Temperature {
                 wgpu::BindGroupLayoutEntry {
                     binding: 0,
                     visibility: wgpu::ShaderStage::FRAGMENT,
-                    ty: wgpu::BindingType::SampledTexture {
+                    ty: wgpu::BindingType::Texture {
                         multisampled: false,
-                        dimension: wgpu::TextureViewDimension::D2,
-                        component_type: wgpu::TextureComponentType::Float,
+                        view_dimension: TextureViewDimension::D2,
+                        sample_type: TextureSampleType::Float { filterable: false }, // TODO correct?
                     },
                     count: None,
                 },
                 wgpu::BindGroupLayoutEntry {
                     binding: 1,
                     visibility: wgpu::ShaderStage::FRAGMENT,
-                    ty: wgpu::BindingType::Sampler { comparison: true },
+                    ty: wgpu::BindingType::Sampler {
+                        comparison: true,
+                        filtering: false, // TODO correct?
+                    },
                     count: None,
                 },
             ],
@@ -106,6 +112,7 @@ impl Temperature {
             lod_max_clamp: 100.0,
             compare: Some(wgpu::CompareFunction::Always),
             anisotropy_clamp: None,
+            border_color: None,
         });
 
         let width = 64 * 8;
@@ -124,7 +131,7 @@ impl Temperature {
             dimension: wgpu::TextureDimension::D2,
             format: wgpu::TextureFormat::R32Float,
             usage: wgpu::TextureUsage::SAMPLED
-                | wgpu::TextureUsage::OUTPUT_ATTACHMENT
+                | wgpu::TextureUsage::RENDER_ATTACHMENT
                 | wgpu::TextureUsage::COPY_DST,
         });
 
@@ -158,45 +165,41 @@ impl Temperature {
         device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
             label: None,
             layout: Some(&pipeline_layout),
-            vertex_stage: wgpu::ProgrammableStageDescriptor {
+            vertex: VertexState {
                 module: &vs_module,
                 entry_point: "main",
+                buffers: &[],
             },
-            fragment_stage: Some(wgpu::ProgrammableStageDescriptor {
+            primitive: PrimitiveState {
+                topology: PrimitiveTopology::TriangleList,
+                front_face: FrontFace::Ccw,
+                cull_mode: CullMode::None,
+                ..Default::default()
+            },
+            depth_stencil: None,
+            multisample: MultisampleState {
+                count: CONFIG.renderer.msaa_samples,
+                mask: !0,
+                alpha_to_coverage_enabled: false,
+            },
+            fragment: Some(FragmentState {
                 module: &fs_module,
                 entry_point: "main",
+                targets: &[ColorTargetState {
+                    format: TextureFormat::Bgra8Unorm,
+                    alpha_blend: BlendState {
+                        src_factor: wgpu::BlendFactor::One,
+                        dst_factor: wgpu::BlendFactor::OneMinusSrcAlpha,
+                        operation: wgpu::BlendOperation::Add,
+                    },
+                    color_blend: BlendState {
+                        src_factor: wgpu::BlendFactor::SrcAlpha,
+                        dst_factor: wgpu::BlendFactor::OneMinusSrcAlpha,
+                        operation: wgpu::BlendOperation::Add,
+                    },
+                    write_mask: wgpu::ColorWrite::ALL,
+                }],
             }),
-            rasterization_state: Some(wgpu::RasterizationStateDescriptor {
-                front_face: wgpu::FrontFace::Ccw,
-                cull_mode: wgpu::CullMode::None,
-                depth_bias: 0,
-                depth_bias_slope_scale: 0.0,
-                depth_bias_clamp: 0.0,
-                clamp_depth: false,
-            }),
-            primitive_topology: wgpu::PrimitiveTopology::TriangleList,
-            color_states: &[wgpu::ColorStateDescriptor {
-                format: wgpu::TextureFormat::Bgra8Unorm,
-                color_blend: wgpu::BlendDescriptor {
-                    src_factor: wgpu::BlendFactor::SrcAlpha,
-                    dst_factor: wgpu::BlendFactor::OneMinusSrcAlpha,
-                    operation: wgpu::BlendOperation::Add,
-                },
-                alpha_blend: wgpu::BlendDescriptor {
-                    src_factor: wgpu::BlendFactor::One,
-                    dst_factor: wgpu::BlendFactor::OneMinusSrcAlpha,
-                    operation: wgpu::BlendOperation::Add,
-                },
-                write_mask: wgpu::ColorWrite::ALL,
-            }],
-            depth_stencil_state: None,
-            vertex_state: wgpu::VertexStateDescriptor {
-                index_format: wgpu::IndexFormat::Uint32,
-                vertex_buffers: &[],
-            },
-            sample_count: CONFIG.renderer.msaa_samples,
-            sample_mask: !0,
-            alpha_to_coverage_enabled: false,
         })
     }
 
@@ -283,12 +286,46 @@ impl Temperature {
         fragment_shader: &str,
     ) -> Result<(ShaderModule, ShaderModule), std::io::Error> {
         let vertex_shader = std::fs::read_to_string(vertex_shader)?;
-        let vs_bytes = load_glsl(&vertex_shader, ShaderStage::Vertex);
-        let vs_module = device.create_shader_module(vs_bytes);
+
+        let mut compiler = shaderc::Compiler::new().unwrap();
+        let binary_result = compiler
+            .compile_into_spirv(
+                &vertex_shader,
+                shaderc::ShaderKind::Vertex,
+                "shader.glsl",
+                "main",
+                None,
+            )
+            .unwrap();
+        let binary_result = binary_result.as_binary_u8().to_vec();
+        let vs_bytes = wgpu::util::make_spirv(&binary_result);
+
+        let vs_module = device.create_shader_module(&ShaderModuleDescriptor {
+            label: Label::default(),
+            source: vs_bytes,
+            flags: ShaderFlags::default(),
+        });
 
         let fragment_shader = std::fs::read_to_string(fragment_shader)?;
-        let fs_bytes = load_glsl(&fragment_shader, ShaderStage::Fragment);
-        let fs_module = device.create_shader_module(fs_bytes);
+
+        let mut compiler = shaderc::Compiler::new().unwrap();
+        let binary_result = compiler
+            .compile_into_spirv(
+                &fragment_shader,
+                shaderc::ShaderKind::Fragment,
+                "shader.glsl",
+                "main",
+                None,
+            )
+            .unwrap();
+        let binary_result = binary_result.as_binary_u8().to_vec();
+        let fs_bytes = wgpu::util::make_spirv(&binary_result);
+
+        let fs_module = device.create_shader_module(&ShaderModuleDescriptor {
+            label: Label::default(),
+            source: fs_bytes,
+            flags: ShaderFlags::default(),
+        });
 
         Ok((vs_module, fs_module))
     }
@@ -339,6 +376,7 @@ impl Temperature {
 
     pub fn _paint(&self, encoder: &mut wgpu::CommandEncoder, view: &wgpu::TextureView) {
         let mut rpass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+            label: None,
             color_attachments: &[wgpu::RenderPassColorAttachmentDescriptor {
                 attachment: view,
                 resolve_target: None,

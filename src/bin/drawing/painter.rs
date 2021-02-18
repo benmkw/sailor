@@ -10,7 +10,8 @@ use wgpu_glyph::{ab_glyph::FontArc, GlyphBrush, GlyphBrushBuilder};
 use winit::{dpi::LogicalSize, event_loop::EventLoop, window::Window};
 
 use crate::app_state::AppState;
-use crate::drawing::helpers::{load_glsl, ShaderStage};
+use crate::drawing::helpers::ShaderStage;
+// use crate::drawing::helpers::{load_glsl, ShaderStage};
 
 use crate::config::CONFIG;
 
@@ -52,7 +53,7 @@ impl Painter {
         let surface = unsafe { instance.create_surface(&window) };
 
         let adapter = block_on(instance.request_adapter(&wgpu::RequestAdapterOptions {
-            power_preference: wgpu::PowerPreference::Default,
+            power_preference: Default::default(),
             // Request an adapter which can render to our surface
             compatible_surface: Some(&surface),
         }))
@@ -60,12 +61,12 @@ impl Painter {
 
         let (mut device, mut queue) = block_on(adapter.request_device(
             &wgpu::DeviceDescriptor {
+                label: None,
                 features: wgpu::Features::empty(),
                 limits: wgpu::Limits {
                     max_uniform_buffer_binding_size: 1 << 16,
                     ..wgpu::Limits::default()
                 },
-                shader_validation: true,
             },
             None,
         ))
@@ -120,8 +121,9 @@ impl Painter {
                 BindGroupLayoutEntry {
                     binding: 0,
                     visibility: wgpu::ShaderStage::VERTEX,
-                    ty: BindingType::UniformBuffer {
-                        dynamic: false,
+                    ty: BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Uniform,
+                        has_dynamic_offset: false,
                         min_binding_size: None,
                     },
                     count: None,
@@ -129,8 +131,9 @@ impl Painter {
                 BindGroupLayoutEntry {
                     binding: 1,
                     visibility: wgpu::ShaderStage::VERTEX,
-                    ty: BindingType::UniformBuffer {
-                        dynamic: false,
+                    ty: BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Uniform,
+                        has_dynamic_offset: false,
                         min_binding_size: None,
                     },
                     count: None,
@@ -139,7 +142,7 @@ impl Painter {
         });
 
         let swap_chain_descriptor = SwapChainDescriptor {
-            usage: TextureUsage::OUTPUT_ATTACHMENT,
+            usage: TextureUsage::RENDER_ATTACHMENT,
             format: TextureFormat::Bgra8Unorm,
             width: size.width,
             height: size.height,
@@ -166,12 +169,12 @@ impl Painter {
             &bind_group_layout,
             &layer_vs_module,
             &layer_fs_module,
-            BlendDescriptor {
+            BlendState {
                 src_factor: BlendFactor::SrcAlpha,
                 dst_factor: BlendFactor::OneMinusSrcAlpha,
                 operation: BlendOperation::Add,
             },
-            BlendDescriptor {
+            BlendState {
                 src_factor: BlendFactor::One,
                 dst_factor: BlendFactor::OneMinusSrcAlpha,
                 operation: BlendOperation::Add,
@@ -184,8 +187,8 @@ impl Painter {
             &bind_group_layout,
             &layer_vs_module,
             &layer_fs_module,
-            BlendDescriptor::REPLACE,
-            BlendDescriptor::REPLACE,
+            BlendState::REPLACE,
+            BlendState::REPLACE,
             true,
         );
 
@@ -245,8 +248,8 @@ impl Painter {
         bind_group_layout: &BindGroupLayout,
         vs_module: &ShaderModule,
         fs_module: &ShaderModule,
-        color_blend: BlendDescriptor,
-        alpha_blend: BlendDescriptor,
+        color_blend: BlendState,
+        alpha_blend: BlendState,
         depth_write_enabled: bool,
     ) -> RenderPipeline {
         let pipeline_layout = device.create_pipeline_layout(&PipelineLayoutDescriptor {
@@ -258,41 +261,49 @@ impl Painter {
         device.create_render_pipeline(&RenderPipelineDescriptor {
             label: None,
             layout: Some(&pipeline_layout),
-            vertex_stage: ProgrammableStageDescriptor {
+            vertex: VertexState {
                 module: &vs_module,
                 entry_point: "main",
+                buffers: &[VertexBufferLayout {
+                    array_stride: std::mem::size_of::<Vertex>() as BufferAddress,
+                    step_mode: InputStepMode::Vertex,
+                    attributes: &[
+                        VertexAttribute {
+                            format: VertexFormat::Short2,
+                            offset: 0,
+                            shader_location: 0,
+                        },
+                        VertexAttribute {
+                            format: VertexFormat::Short2,
+                            offset: 4,
+                            shader_location: 1,
+                        },
+                        VertexAttribute {
+                            format: VertexFormat::Uint,
+                            offset: 8,
+                            shader_location: 2,
+                        },
+                    ],
+                }],
             },
-            fragment_stage: Some(ProgrammableStageDescriptor {
-                module: &fs_module,
-                entry_point: "main",
-            }),
-            rasterization_state: Some(RasterizationStateDescriptor {
+            primitive: PrimitiveState {
+                topology: PrimitiveTopology::TriangleList,
                 front_face: FrontFace::Ccw,
                 cull_mode: CullMode::None,
-                depth_bias: 0,
-                depth_bias_slope_scale: 0.0,
-                depth_bias_clamp: 0.0,
-                clamp_depth: false, // inactive because not enabled in extensions
-            }),
-            primitive_topology: PrimitiveTopology::TriangleList,
-            color_states: &[ColorStateDescriptor {
-                format: TextureFormat::Bgra8Unorm,
-                color_blend,
-                alpha_blend,
-                write_mask: ColorWrite::ALL,
-            }],
-            depth_stencil_state: Some(DepthStencilStateDescriptor {
+                ..Default::default()
+            },
+            depth_stencil: Some(DepthStencilState {
                 format: TextureFormat::Depth24PlusStencil8,
                 depth_write_enabled,
                 depth_compare: CompareFunction::Greater,
-                stencil: wgpu::StencilStateDescriptor {
-                    front: StencilStateFaceDescriptor {
+                stencil: wgpu::StencilState {
+                    front: StencilFaceState {
                         compare: CompareFunction::NotEqual,
                         fail_op: StencilOperation::Keep,
                         depth_fail_op: StencilOperation::Replace,
                         pass_op: StencilOperation::Replace,
                     },
-                    back: StencilStateFaceDescriptor {
+                    back: StencilFaceState {
                         compare: CompareFunction::NotEqual,
                         fail_op: StencilOperation::Keep,
                         depth_fail_op: StencilOperation::Replace,
@@ -301,34 +312,21 @@ impl Painter {
                     read_mask: std::u32::MAX,
                     write_mask: std::u32::MAX,
                 },
+                bias: Default::default(),
+                clamp_depth: false, // inactive because not enabled in extensions
             }),
-            vertex_state: VertexStateDescriptor {
-                index_format: IndexFormat::Uint32,
-                vertex_buffers: &[VertexBufferDescriptor {
-                    stride: std::mem::size_of::<Vertex>() as BufferAddress,
-                    step_mode: InputStepMode::Vertex,
-                    attributes: &[
-                        VertexAttributeDescriptor {
-                            format: VertexFormat::Short2,
-                            offset: 0,
-                            shader_location: 0,
-                        },
-                        VertexAttributeDescriptor {
-                            format: VertexFormat::Short2,
-                            offset: 4,
-                            shader_location: 1,
-                        },
-                        VertexAttributeDescriptor {
-                            format: VertexFormat::Uint,
-                            offset: 8,
-                            shader_location: 2,
-                        },
-                    ],
+
+            fragment: Some(FragmentState {
+                module: &fs_module,
+                entry_point: "main",
+                targets: &[ColorTargetState {
+                    format: TextureFormat::Bgra8Unorm,
+                    alpha_blend,
+                    color_blend,
+                    write_mask: ColorWrite::ALL,
                 }],
-            },
-            sample_count: CONFIG.renderer.msaa_samples,
-            sample_mask: !0,
-            alpha_to_coverage_enabled: false,
+            }),
+            multisample: MultisampleState::default(),
         })
     }
 
@@ -441,15 +439,19 @@ impl Painter {
             entries: &[
                 wgpu::BindGroupEntry {
                     binding: 0,
-                    resource: BindingResource::Buffer(
-                        uniform_buffer.slice(0..Self::uniform_buffer_size()),
-                    ),
+                    resource: BindingResource::Buffer {
+                        buffer: uniform_buffer,
+                        offset: 0,
+                        size: Some(std::num::NonZeroU64::new(Self::uniform_buffer_size()).unwrap()),
+                    },
                 },
                 wgpu::BindGroupEntry {
                     binding: 1,
-                    resource: BindingResource::Buffer(
-                        tile_transform_buffer.0.slice(0..tile_transform_buffer.1),
-                    ),
+                    resource: BindingResource::Buffer {
+                        buffer: &tile_transform_buffer.0,
+                        offset: 0,
+                        size: Some(std::num::NonZeroU64::new(tile_transform_buffer.1).unwrap()),
+                    },
                 },
             ],
         })
@@ -462,12 +464,46 @@ impl Painter {
         fragment_shader: &str,
     ) -> Result<(ShaderModule, ShaderModule), std::io::Error> {
         let vertex_shader = std::fs::read_to_string(vertex_shader)?;
-        let vs_bytes = load_glsl(&vertex_shader, ShaderStage::Vertex);
-        let vs_module = device.create_shader_module(vs_bytes);
+
+        let mut compiler = shaderc::Compiler::new().unwrap();
+        let binary_result = compiler
+            .compile_into_spirv(
+                &vertex_shader,
+                shaderc::ShaderKind::Vertex,
+                "shader.glsl",
+                "main",
+                None,
+            )
+            .unwrap();
+        let binary_result = binary_result.as_binary_u8().to_vec();
+        let vs_bytes = wgpu::util::make_spirv(&binary_result);
+
+        let vs_module = device.create_shader_module(&ShaderModuleDescriptor {
+            label: Label::default(),
+            source: vs_bytes,
+            flags: ShaderFlags::default(),
+        });
 
         let fragment_shader = std::fs::read_to_string(fragment_shader)?;
-        let fs_bytes = load_glsl(&fragment_shader, ShaderStage::Fragment);
-        let fs_module = device.create_shader_module(fs_bytes);
+
+        let mut compiler = shaderc::Compiler::new().unwrap();
+        let binary_result = compiler
+            .compile_into_spirv(
+                &fragment_shader,
+                shaderc::ShaderKind::Fragment,
+                "shader.glsl",
+                "main",
+                None,
+            )
+            .unwrap();
+        let binary_result = binary_result.as_binary_u8().to_vec();
+        let fs_bytes = wgpu::util::make_spirv(&binary_result);
+
+        let fs_module = device.create_shader_module(&ShaderModuleDescriptor {
+            label: Label::default(),
+            source: fs_bytes,
+            flags: ShaderFlags::default(),
+        });
 
         Ok((vs_module, fs_module))
     }
@@ -490,12 +526,12 @@ impl Painter {
                         &self.bind_group_layout,
                         &vs_module,
                         &fs_module,
-                        BlendDescriptor {
+                        BlendState {
                             src_factor: BlendFactor::SrcAlpha,
                             dst_factor: BlendFactor::OneMinusSrcAlpha,
                             operation: BlendOperation::Add,
                         },
-                        BlendDescriptor {
+                        BlendState {
                             src_factor: BlendFactor::One,
                             dst_factor: BlendFactor::OneMinusSrcAlpha,
                             operation: BlendOperation::Add,
@@ -508,8 +544,8 @@ impl Painter {
                         &self.bind_group_layout,
                         &vs_module,
                         &fs_module,
-                        BlendDescriptor::REPLACE,
-                        BlendDescriptor::REPLACE,
+                        BlendState::REPLACE,
+                        BlendState::REPLACE,
                         true,
                     );
                     true
@@ -594,7 +630,7 @@ impl Painter {
             sample_count,
             dimension: TextureDimension::D2,
             format: swap_chain_descriptor.format,
-            usage: TextureUsage::OUTPUT_ATTACHMENT | TextureUsage::SAMPLED,
+            usage: TextureUsage::RENDER_ATTACHMENT | TextureUsage::SAMPLED,
         };
 
         device
@@ -616,7 +652,7 @@ impl Painter {
             sample_count: CONFIG.renderer.msaa_samples,
             dimension: TextureDimension::D2,
             format: TextureFormat::Depth24PlusStencil8,
-            usage: TextureUsage::OUTPUT_ATTACHMENT | TextureUsage::SAMPLED,
+            usage: TextureUsage::RENDER_ATTACHMENT | TextureUsage::SAMPLED,
         };
 
         device
@@ -643,6 +679,7 @@ impl Painter {
             if let Ok(frame) = self.swap_chain.get_current_frame() {
                 {
                     let mut render_pass = encoder.begin_render_pass(&RenderPassDescriptor {
+                        label: None,
                         color_attachments: &[RenderPassColorAttachmentDescriptor {
                             attachment: if CONFIG.renderer.msaa_samples > 1 {
                                 &self.multisampled_framebuffer
