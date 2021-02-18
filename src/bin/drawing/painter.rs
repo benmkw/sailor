@@ -766,6 +766,37 @@ impl Painter {
                             },
                         );
 
+                        let x = s.x.max(0.0) as u32;
+                        let y = s.y.max(0.0) as u32;
+
+                        let width = e.x as u32 - x;
+                        let height = e.y as u32 - y;
+
+                        println!("{}/{}", width, height);
+
+                        let excess_width =
+                            (x as i32 + width as i32 - app_state.screen.width as i32).max(0) as u32;
+                        let excess_height = (y as i32 + height as i32
+                            - app_state.screen.height as i32)
+                            .max(0) as u32;
+
+                        println!(
+                            "{}/{}, {}/{}",
+                            x + width - app_state.screen.width,
+                            y + height - app_state.screen.height,
+                            excess_width,
+                            excess_height
+                        );
+
+                        println!(
+                            "{}/{}, {}/{}",
+                            x,
+                            y,
+                            width - excess_width,
+                            height - excess_height
+                        );
+                        println!("{}, {}", app_state.screen.width, app_state.screen.height);
+
                         render_pass.set_scissor_rect(
                             s.x as u32,
                             s.y as u32,
