@@ -2,7 +2,7 @@ use crate::drawing::ui::*;
 use crate::*;
 use lyon::math::Point;
 use stats::Stats;
-use std::collections::BTreeMap;
+use std::collections::{btree_map::Entry, BTreeMap};
 use std::sync::{Arc, RwLock};
 
 pub struct AppState {
@@ -80,7 +80,7 @@ impl AppState {
 
         self.tile_cache.finalize_loaded_tiles();
         for tile_id in tile_field.iter() {
-            if !self.visible_tiles.contains_key(&tile_id) {
+            if let Entry::Vacant(e) = self.visible_tiles.entry(tile_id) {
                 self.tile_cache.request_tile(
                     &tile_id,
                     self.feature_collection.clone(),
@@ -93,7 +93,7 @@ impl AppState {
 
                     visible_tile.load_collider();
 
-                    self.visible_tiles.insert(tile_id, visible_tile);
+                    e.insert(visible_tile);
 
                     // Remove old bigger tile when all 4 smaller tiles are loaded.
                     let mut count = 0;

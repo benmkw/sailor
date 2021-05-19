@@ -10,7 +10,7 @@ use wgpu_glyph::{ab_glyph::FontArc, GlyphBrush, GlyphBrushBuilder};
 use winit::{dpi::LogicalSize, event_loop::EventLoop, window::Window};
 
 use crate::app_state::AppState;
-use crate::drawing::helpers::ShaderStage;
+
 // use crate::drawing::helpers::{load_glsl, ShaderStage};
 
 use crate::config::CONFIG;
@@ -169,12 +169,12 @@ impl Painter {
             &bind_group_layout,
             &layer_vs_module,
             &layer_fs_module,
-            BlendState {
+            BlendComponent {
                 src_factor: BlendFactor::SrcAlpha,
                 dst_factor: BlendFactor::OneMinusSrcAlpha,
                 operation: BlendOperation::Add,
             },
-            BlendState {
+            BlendComponent {
                 src_factor: BlendFactor::One,
                 dst_factor: BlendFactor::OneMinusSrcAlpha,
                 operation: BlendOperation::Add,
@@ -187,8 +187,8 @@ impl Painter {
             &bind_group_layout,
             &layer_vs_module,
             &layer_fs_module,
-            BlendState::REPLACE,
-            BlendState::REPLACE,
+            BlendComponent::REPLACE,
+            BlendComponent::REPLACE,
             true,
         );
 
@@ -248,8 +248,8 @@ impl Painter {
         bind_group_layout: &BindGroupLayout,
         vs_module: &ShaderModule,
         fs_module: &ShaderModule,
-        color_blend: BlendState,
-        alpha_blend: BlendState,
+        color_blend: BlendComponent,
+        alpha_blend: BlendComponent,
         depth_write_enabled: bool,
     ) -> RenderPipeline {
         let pipeline_layout = device.create_pipeline_layout(&PipelineLayoutDescriptor {
@@ -269,17 +269,17 @@ impl Painter {
                     step_mode: InputStepMode::Vertex,
                     attributes: &[
                         VertexAttribute {
-                            format: VertexFormat::Short2,
+                            format: VertexFormat::Uint16x2,
                             offset: 0,
                             shader_location: 0,
                         },
                         VertexAttribute {
-                            format: VertexFormat::Short2,
+                            format: VertexFormat::Uint16x2,
                             offset: 4,
                             shader_location: 1,
                         },
                         VertexAttribute {
-                            format: VertexFormat::Uint,
+                            format: VertexFormat::Uint32,
                             offset: 8,
                             shader_location: 2,
                         },
@@ -289,7 +289,6 @@ impl Painter {
             primitive: PrimitiveState {
                 topology: PrimitiveTopology::TriangleList,
                 front_face: FrontFace::Ccw,
-                cull_mode: CullMode::None,
                 ..Default::default()
             },
             depth_stencil: Some(DepthStencilState {
@@ -313,7 +312,6 @@ impl Painter {
                     write_mask: std::u32::MAX,
                 },
                 bias: Default::default(),
-                clamp_depth: false, // inactive because not enabled in extensions
             }),
 
             fragment: Some(FragmentState {
@@ -321,8 +319,10 @@ impl Painter {
                 entry_point: "main",
                 targets: &[ColorTargetState {
                     format: TextureFormat::Bgra8Unorm,
-                    alpha_blend,
-                    color_blend,
+                    blend: Some(BlendState {
+                        color: alpha_blend,
+                        alpha: color_blend,
+                    }),
                     write_mask: ColorWrite::ALL,
                 }],
             }),
@@ -336,7 +336,7 @@ impl Painter {
         screen: &Screen,
         feature_collection: &FeatureCollection,
     ) -> Vec<(Buffer, usize)> {
-        let canvas_size_len = 4 * 4 as usize;
+        let canvas_size_len = 4 * 4_usize;
         let canvas_size_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: None,
             contents: as_byte_slice(&[screen.width as f32, screen.height as f32, 0.0, 0.0]),
@@ -439,19 +439,19 @@ impl Painter {
             entries: &[
                 wgpu::BindGroupEntry {
                     binding: 0,
-                    resource: BindingResource::Buffer {
+                    resource: BindingResource::Buffer(BufferBinding {
                         buffer: uniform_buffer,
                         offset: 0,
                         size: Some(std::num::NonZeroU64::new(Self::uniform_buffer_size()).unwrap()),
-                    },
+                    }),
                 },
                 wgpu::BindGroupEntry {
                     binding: 1,
-                    resource: BindingResource::Buffer {
+                    resource: BindingResource::Buffer(BufferBinding {
                         buffer: &tile_transform_buffer.0,
                         offset: 0,
                         size: Some(std::num::NonZeroU64::new(tile_transform_buffer.1).unwrap()),
-                    },
+                    }),
                 },
             ],
         })
@@ -526,12 +526,12 @@ impl Painter {
                         &self.bind_group_layout,
                         &vs_module,
                         &fs_module,
-                        BlendState {
+                        BlendComponent {
                             src_factor: BlendFactor::SrcAlpha,
                             dst_factor: BlendFactor::OneMinusSrcAlpha,
                             operation: BlendOperation::Add,
                         },
-                        BlendState {
+                        BlendComponent {
                             src_factor: BlendFactor::One,
                             dst_factor: BlendFactor::OneMinusSrcAlpha,
                             operation: BlendOperation::Add,
@@ -544,8 +544,8 @@ impl Painter {
                         &self.bind_group_layout,
                         &vs_module,
                         &fs_module,
-                        BlendState::REPLACE,
-                        BlendState::REPLACE,
+                        BlendComponent::REPLACE,
+                        BlendComponent::REPLACE,
                         true,
                     );
                     true
@@ -620,7 +620,7 @@ impl Painter {
         let multisampled_texture_extent = Extent3d {
             width: swap_chain_descriptor.width,
             height: swap_chain_descriptor.height,
-            depth: 1,
+            depth_or_array_layers: 1,
         };
         let multisampled_frame_descriptor = &TextureDescriptor {
             label: None,
@@ -642,7 +642,7 @@ impl Painter {
         let texture_extent = Extent3d {
             width: swap_chain_descriptor.width,
             height: swap_chain_descriptor.height,
-            depth: 1,
+            depth_or_array_layers: 1,
         };
         let frame_descriptor = &TextureDescriptor {
             label: None,
@@ -680,8 +680,8 @@ impl Painter {
                 {
                     let mut render_pass = encoder.begin_render_pass(&RenderPassDescriptor {
                         label: None,
-                        color_attachments: &[RenderPassColorAttachmentDescriptor {
-                            attachment: if CONFIG.renderer.msaa_samples > 1 {
+                        color_attachments: &[RenderPassColorAttachment {
+                            view: if CONFIG.renderer.msaa_samples > 1 {
                                 &self.multisampled_framebuffer
                             } else {
                                 &frame.output.view
@@ -696,19 +696,17 @@ impl Painter {
                                 store: true,
                             },
                         }],
-                        depth_stencil_attachment: Some(
-                            RenderPassDepthStencilAttachmentDescriptor {
-                                attachment: &self.stencil,
-                                depth_ops: Some(Operations::<f32> {
-                                    load: LoadOp::Clear(0.0),
-                                    store: true,
-                                }),
-                                stencil_ops: Some(Operations::<u32> {
-                                    load: LoadOp::Clear(255),
-                                    store: true,
-                                }),
-                            },
-                        ),
+                        depth_stencil_attachment: Some(RenderPassDepthStencilAttachment {
+                            view: &self.stencil,
+                            depth_ops: Some(Operations::<f32> {
+                                load: LoadOp::Clear(0.0),
+                                store: true,
+                            }),
+                            stencil_ops: Some(Operations::<u32> {
+                                load: LoadOp::Clear(255),
+                                store: true,
+                            }),
+                        }),
                     });
                     render_pass.set_bind_group(0, &self.bind_group, &[]);
                     let vec = vec4(0.0, 0.0, 0.0, 1.0);

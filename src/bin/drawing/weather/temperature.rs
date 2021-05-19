@@ -1,3 +1,5 @@
+use std::num::NonZeroU32;
+
 use crossbeam_channel::{unbounded, TryRecvError};
 use notify::{event::ModifyKind, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
 use wgpu::{
@@ -7,7 +9,6 @@ use wgpu::{
 
 use wgpu::*; // TODO remove
 
-use crate::drawing::helpers::ShaderStage;
 // use crate::drawing::helpers::{load_glsl, ShaderStage};
 
 use crate::config::CONFIG;
@@ -123,7 +124,7 @@ impl Temperature {
             size: wgpu::Extent3d {
                 width,
                 height,
-                depth: 1,
+                depth_or_array_layers: 1,
             },
             // array_layer_count: 1,
             mip_level_count: 1,
@@ -173,7 +174,6 @@ impl Temperature {
             primitive: PrimitiveState {
                 topology: PrimitiveTopology::TriangleList,
                 front_face: FrontFace::Ccw,
-                cull_mode: CullMode::None,
                 ..Default::default()
             },
             depth_stencil: None,
@@ -187,16 +187,18 @@ impl Temperature {
                 entry_point: "main",
                 targets: &[ColorTargetState {
                     format: TextureFormat::Bgra8Unorm,
-                    alpha_blend: BlendState {
-                        src_factor: wgpu::BlendFactor::One,
-                        dst_factor: wgpu::BlendFactor::OneMinusSrcAlpha,
-                        operation: wgpu::BlendOperation::Add,
-                    },
-                    color_blend: BlendState {
-                        src_factor: wgpu::BlendFactor::SrcAlpha,
-                        dst_factor: wgpu::BlendFactor::OneMinusSrcAlpha,
-                        operation: wgpu::BlendOperation::Add,
-                    },
+                    blend: Some(BlendState {
+                        alpha: BlendComponent {
+                            src_factor: wgpu::BlendFactor::One,
+                            dst_factor: wgpu::BlendFactor::OneMinusSrcAlpha,
+                            operation: wgpu::BlendOperation::Add,
+                        },
+                        color: BlendComponent {
+                            src_factor: wgpu::BlendFactor::SrcAlpha,
+                            dst_factor: wgpu::BlendFactor::OneMinusSrcAlpha,
+                            operation: wgpu::BlendOperation::Add,
+                        },
+                    }),
                     write_mask: wgpu::ColorWrite::ALL,
                 }],
             }),
@@ -255,15 +257,15 @@ impl Temperature {
             device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
 
         encoder.copy_buffer_to_texture(
-            wgpu::BufferCopyView {
-                layout: wgpu::TextureDataLayout {
+            wgpu::ImageCopyBuffer {
+                layout: wgpu::ImageDataLayout {
                     offset: 0,
-                    bytes_per_row: width * 4,
-                    rows_per_image: height,
+                    bytes_per_row: NonZeroU32::new(width * 4),
+                    rows_per_image: NonZeroU32::new(height),
                 },
                 buffer,
             },
-            wgpu::TextureCopyView {
+            wgpu::ImageCopyTexture {
                 texture: &self.texture,
                 mip_level: 0,
                 // array_layer: 0,
@@ -272,7 +274,7 @@ impl Temperature {
             wgpu::Extent3d {
                 width,
                 height,
-                depth: 1,
+                depth_or_array_layers: 1,
             },
         );
 
@@ -377,8 +379,8 @@ impl Temperature {
     pub fn _paint(&self, encoder: &mut wgpu::CommandEncoder, view: &wgpu::TextureView) {
         let mut rpass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
             label: None,
-            color_attachments: &[wgpu::RenderPassColorAttachmentDescriptor {
-                attachment: view,
+            color_attachments: &[wgpu::RenderPassColorAttachment {
+                view,
                 resolve_target: None,
                 ops: wgpu::Operations::<wgpu::Color> {
                     load: wgpu::LoadOp::Clear(wgpu::Color {
