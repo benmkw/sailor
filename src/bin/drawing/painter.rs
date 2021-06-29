@@ -41,7 +41,7 @@ pub struct Painter {
 impl Painter {
     /// Initializes the entire draw machinery.
     pub fn init(event_loop: &EventLoop<()>, width: u32, height: u32, app_state: &AppState) -> Self {
-        let window = Window::new(&event_loop).unwrap();
+        let window = Window::new(event_loop).unwrap();
         window.set_inner_size(LogicalSize {
             width: width as f64,
             height: height as f64,
@@ -254,7 +254,7 @@ impl Painter {
     ) -> RenderPipeline {
         let pipeline_layout = device.create_pipeline_layout(&PipelineLayoutDescriptor {
             label: None,
-            bind_group_layouts: &[&bind_group_layout],
+            bind_group_layouts: &[bind_group_layout],
             push_constant_ranges: &[],
         });
 
@@ -262,7 +262,7 @@ impl Painter {
             label: None,
             layout: Some(&pipeline_layout),
             vertex: VertexState {
-                module: &vs_module,
+                module: vs_module,
                 entry_point: "main",
                 buffers: &[VertexBufferLayout {
                     array_stride: std::mem::size_of::<Vertex>() as BufferAddress,
@@ -315,7 +315,7 @@ impl Painter {
             }),
 
             fragment: Some(FragmentState {
-                module: &fs_module,
+                module: fs_module,
                 entry_point: "main",
                 targets: &[ColorTargetState {
                     format: TextureFormat::Bgra8Unorm,
@@ -351,7 +351,7 @@ impl Painter {
             contents: if len == 0 {
                 &[0; 48]
             } else {
-                as_byte_slice(&buffer.as_slice())
+                as_byte_slice(buffer.as_slice())
             },
             usage: BufferUsage::UNIFORM | BufferUsage::COPY_SRC,
         });
@@ -418,7 +418,7 @@ impl Painter {
     ) {
         let mut total_bytes = 0;
         for (buffer, len) in source {
-            encoder.copy_buffer_to_buffer(&buffer, 0, &destination, total_bytes, *len as u64);
+            encoder.copy_buffer_to_buffer(buffer, 0, destination, total_bytes, *len as u64);
             total_bytes += *len as u64;
         }
     }
@@ -666,7 +666,7 @@ impl Painter {
             .create_command_encoder(&CommandEncoderDescriptor { label: None });
 
         let feature_collection = app_state.feature_collection().read().unwrap().clone();
-        self.update_uniforms(&mut encoder, &app_state, &feature_collection);
+        self.update_uniforms(&mut encoder, app_state, &feature_collection);
         self.bind_group = Self::create_blend_bind_group(
             &self.device,
             &self.bind_group_layout,

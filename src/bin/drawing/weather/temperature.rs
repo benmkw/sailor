@@ -63,7 +63,7 @@ impl Temperature {
         };
 
         let (layer_vs_module, layer_fs_module) = Self::load_shader(
-            &device,
+            device,
             &CONFIG.renderer.temperature.vertex_shader,
             &CONFIG.renderer.temperature.fragment_shader,
         )
@@ -95,7 +95,7 @@ impl Temperature {
         });
 
         let pipeline = Self::create_render_pipeline(
-            &device,
+            device,
             &bind_group_layout,
             &layer_vs_module,
             &layer_fs_module,
@@ -136,7 +136,7 @@ impl Temperature {
                 | wgpu::TextureUsage::COPY_DST,
         });
 
-        let bind_group = Self::create_bind_group(&device, &bind_group_layout, &texture, &sampler);
+        let bind_group = Self::create_bind_group(device, &bind_group_layout, &texture, &sampler);
 
         let init_command_buf = init_encoder.finish();
         queue.submit(vec![init_command_buf]);
@@ -159,7 +159,7 @@ impl Temperature {
     ) -> RenderPipeline {
         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: None,
-            bind_group_layouts: &[&bind_group_layout],
+            bind_group_layouts: &[bind_group_layout],
             push_constant_ranges: &[],
         });
 
@@ -167,7 +167,7 @@ impl Temperature {
             label: None,
             layout: Some(&pipeline_layout),
             vertex: VertexState {
-                module: &vs_module,
+                module: vs_module,
                 entry_point: "main",
                 buffers: &[],
             },
@@ -183,7 +183,7 @@ impl Temperature {
                 alpha_to_coverage_enabled: false,
             },
             fragment: Some(FragmentState {
-                module: &fs_module,
+                module: fs_module,
                 entry_point: "main",
                 targets: &[ColorTargetState {
                     format: TextureFormat::Bgra8Unorm,

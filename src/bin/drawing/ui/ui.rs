@@ -177,7 +177,7 @@ impl HUD {
 
                         let mut rules = app_state
                             .css_cache
-                            .get_matching_rules_mut(&object.selector());
+                            .get_matching_rules_mut(object.selector());
                         for rule in rules.iter_mut() {
                             let show_block =
                                 add_header_separator(&ui, im_str!("{}", rule.selector));
@@ -294,7 +294,7 @@ fn add_color_picker(ui: &Ui, rule: &mut Rule, attribute: &str) {
     let mut color = [color.r, color.g, color.b, color.a];
     let label = im_str!("{}", attribute);
     let cp = ColorEdit::new(&label, EditableColor::Float4(&mut color));
-    cp.build(&ui);
+    cp.build(ui);
 
     rule.kvs.insert(
         attribute.to_string(),
@@ -325,7 +325,7 @@ fn add_slider_float(ui: &Ui, rule: &mut Rule, attribute: &str) {
     let label = im_str!("{}", attribute);
     imgui::Slider::new(&label)
         .range(0.0..=10.0)
-        .build(&ui, &mut value);
+        .build(ui, &mut value);
 
     rule.kvs
         .insert(attribute.to_string(), CSSValue::Number(Number::Px(value)));
@@ -361,5 +361,5 @@ fn add_header_separator(ui: &Ui, title: impl Into<ImString>) -> bool {
         .flags(
             TreeNodeFlags::FRAMED | TreeNodeFlags::SELECTED | TreeNodeFlags::NO_TREE_PUSH_ON_OPEN,
         )
-        .build(&ui)
+        .build(ui)
 }

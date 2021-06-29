@@ -110,7 +110,7 @@ impl RulesCache {
                 kind: EventKind::Modify(ModifyKind::Data(_)),
                 paths,
                 ..
-            })) => self.try_reload_from_file(&paths[0].as_path()),
+            })) => self.try_reload_from_file(paths[0].as_path()),
             // Everything is alright but file wasn't actually changed.
             Ok(Ok(_)) => false,
             Ok(Err(err)) => {
@@ -201,13 +201,13 @@ impl std::fmt::Display for Selector {
 
         for class in &self.classes {
             selector += ".";
-            selector += &class;
+            selector += class;
         }
         for (k, v) in &self.any {
             selector += "[";
-            selector += &k;
+            selector += k;
             selector += "=";
-            selector += &v;
+            selector += v;
             selector += "]";
         }
         write!(f, "({})", selector)
