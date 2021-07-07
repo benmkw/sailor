@@ -34,10 +34,10 @@ malloc_size_of_derive = "0.1"
 nalgebra = "0.27"
 nalgebra-glm = "0.13"
 ncollide2d = "0.30"
-nom = "6.1"
+nom = "7.0.0-alpha1"
 notify = "5.0.0-pre.8"
 once_cell = "1.8"
-parity-util-mem = "0.9"
+parity-util-mem = "0.10"
 pollster = "0.2"
 pretty_env_logger = "0.4"
 quick-protobuf = "0.8"
@@ -46,11 +46,13 @@ serde_derive = "1.0"
 shaderc = "0.7"
 ureq = "2.1"
 varint = "0.9"
-wgpu = "0.8"
-wgpu_glyph = "0.12"
+wgpu = "0.9"
+wgpu_glyph = "0.13"
 winit = "0.24"
 imgui-winit-support= "0.7"
 
+[patch.crates-io]
+imgui-wgpu = { git = "https://github.com/Yatekii/imgui-wgpu-rs" , rev = "ed3fae4f5f9009323e5496fd3cadf053b367bdcd" }
 
 [profile.release]
 debug = true
